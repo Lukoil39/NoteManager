@@ -1,0 +1,105 @@
+package geekbrains.ru.notemanager.ui.note
+
+import android.content.Context
+import android.content.Intent
+import android.os.Bundle
+import android.os.Handler
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.MenuItem
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.widget.doAfterTextChanged
+import androidx.lifecycle.ViewModelProviders
+import geekbrains.ru.notemanager.DATE_TIME_FORMAT
+import geekbrains.ru.notemanager.R
+import geekbrains.ru.notemanager.model.Color
+import geekbrains.ru.notemanager.model.Note
+import geekbrains.ru.notemanager.viewmodel.note.NoteViewModel
+import kotlinx.android.synthetic.main.activity_note.*
+import java.text.SimpleDateFormat
+import java.util.*
+
+private const val SAVE_DELAY = 2000L
+
+@Suppress("DEPRECATION")
+class NoteActivity : AppCompatActivity() {
+
+    companion object {
+        private val EXTRA_NOTE = NoteActivity::class.java.name + "extra.NOTE"
+
+        fun getStartIntent(context: Context, note: Note?): Intent {
+            val intent = Intent(context, NoteActivity::class.java)
+            intent.putExtra(EXTRA_NOTE, note)
+            return intent
+        }
+    }
+    private lateinit var viewModel: NoteViewModel
+    private var note: Note? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_note)
+        viewModel = ViewModelProviders.of(this).get(NoteViewModel::class.java)
+        note = intent.getParcelableExtra(EXTRA_NOTE)
+        setSupportActionBar(toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+
+        supportActionBar?.title = if (note != null) {
+            SimpleDateFormat(DATE_TIME_FORMAT,
+                Locale.getDefault()).format(note!!.lastChanged)
+        } else {
+            getString(R.string.new_note_title)
+        }
+
+        titleEt.doAfterTextChanged { triggerSaveNote()}
+        bodyEt.doAfterTextChanged { triggerSaveNote()}
+
+        initView()
+    }
+
+    private fun initView() {
+        if (note != null) {
+            titleEt.setText(note?.title ?: "")
+            bodyEt.setText(note?.note ?: "")
+            val color = when(note!!.color) {
+                Color.WHITE -> R.color.color_white
+                Color.VIOLET -> R.color.color_violet
+                Color.YELLOW -> R.color.color_yello
+                Color.RED -> R.color.color_red
+                Color.PINK -> R.color.color_pink
+                Color.GREEN -> R.color.color_green
+                Color.BLUE -> R.color.color_blue
+            }
+
+            toolbar.setBackgroundColor(resources.getColor(color))
+        }
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean = when(item.itemId) {
+        android.R.id.home -> {
+            onBackPressed()
+            true
+        }
+        else -> super.onOptionsItemSelected(item)
+    }
+
+    private fun triggerSaveNote() {
+        if (titleEt.text?.length?:0 < 3) return
+
+        Handler().postDelayed(object : Runnable {
+            override fun run() {
+                note = note?.copy(title = titleEt.text.toString(),
+                    note = bodyEt.text.toString(),
+                    lastChanged = Date())
+                    ?: createNewNote()
+
+                if (note != null) viewModel.saveChanges(note!!)
+            }
+
+        }, SAVE_DELAY)
+    }
+
+    private fun createNewNote(): Note = Note(UUID.randomUUID().toString(),
+        titleEt.text.toString(),
+        bodyEt.text.toString())
+}
